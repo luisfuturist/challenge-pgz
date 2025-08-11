@@ -1,0 +1,33 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/dist": true,
+    "**/__pycache__": true,
+    ".vscode": false
+  },
+  "search.exclude": {
+    "**/__pycache__": true
+  },
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "README.md": "CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, LICENSE",
+  },
+  // Auto fix
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "always"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": false
+  },
+  "files.associations": {
+    "**/*.md": "markdown"
+  }
+}

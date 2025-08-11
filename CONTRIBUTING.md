@@ -3,15 +3,20 @@
 Thank you for your interest in contributing to Wibblo! This document provides guidelines and information for contributors.
 
 - [Managing the Project](#managing-the-project)
-- [Preparing the Environment Locally](#preparing-the-environment-locally)
-- [Submitting a Pull Request](#submitting-a-pull-request)
-- [Running the Game](#running-the-game)
+- [Preparing the Environment](#preparing-the-environment)
+  - [Preparing the Environment Locally](#preparing-the-environment-locally)
+  - [Preparing the Local Repository](#preparing-the-local-repository)
+  - [Preparing the Virtual Environment](#preparing-the-virtual-environment)
+- [Contributing](#contributing)
+  - [Committing](#committing)
+  - [Pushing to the Repositories](#pushing-to-the-repositories)
+  - [Creating Pull Requests](#creating-pull-requests)
+  - [Submitting a Pull Request](#submitting-a-pull-request)
+- [Running Standalone Executables](#running-standalone-executables)
 - [Developing](#developing)
+  - [Running the Game](#running-the-game)
   - [Writing Code](#writing-code)
   - [Checking Code Quality](#checking-code-quality)
-  - [Committing Code](#committing-code)
-  - [Pushing Code to the Repositories](#pushing-code-to-the-repositories)
-  - [Creating Pull Requests](#creating-pull-requests)
   - [Getting AI Assistance](#getting-ai-assistance)
   - [Delegating Tasks to AI Software Engineers](#delegating-tasks-to-ai-software-engineers)
 - [Designing](#designing)
@@ -28,7 +33,7 @@ Thank you for your interest in contributing to Wibblo! This document provides gu
 
 ## Managing the Project
 
-> [!NOTE]
+> [!TIP]
 > You can edit the project management documents directly in the `./project` folder via GitHub website, but it's recommended to edit the documents locally.
 
 We approach the project management in a git-based way. We foster an intuitive, transparent and proactivity-driven process. You can find all the project management documents in the `./project` folder.
@@ -43,16 +48,19 @@ Here's a brief overview of the documents:
 - **[Suggestions](/project/SUGGESTIONS.md)**: Concepts and ideas under review for potential inclusion.
 - **[Changelog](/project/CHANGELOG.md)**: A detailed chronological record of updates, changes, and improvements.
 
-## Preparing the Environment Locally
+## Preparing the Environment
 
-You will need to have installed an IDE. It's recommended to use [Vscode](https://code.visualstudio.com/download) or any Vscode compatible editor.
+### Preparing the Environment Locally
 
 1. **Install the main dependencies**
    - Ensure you have the following prerequisites installed on your system:
       - [Git](https://git-scm.com/downloads)
       - [Python 3.13+](https://www.python.org/downloads/)
 
-2. **Configure the IDE (recommended)**
+2. **Install the IDE (recommended)**
+   - [Vscode](https://code.visualstudio.com/download) or any Vscode compatible editor.
+
+3. **Configure the IDE (recommended)**
   - For Visual Studio Code, consider installing the following extensions:
     - [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one)
     - [GitLens](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens) (optional)
@@ -64,25 +72,36 @@ You will need to have installed an IDE. It's recommended to use [Vscode](https:/
     - [Black](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
     - [Flake8](https://marketplace.visualstudio.com/items?itemName=ms-python.flake8)
 
-3. **Clone the repository**
+4. **Clone the repository**. See [Preparing the Local Repository](#preparing-the-local-repository) for more information.
 
-   Clone the repository to your local machine:
+5. **Prepare the virtual environment**. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
 
-   ```sh
-   git clone https://github.com/luisfuturist/challenge-pgz.git
-   cd challenge-pgz/
-   ```
+### Preparing the Local Repository
 
-4. **Create the virtual environment**
+To clone the repository, you can use the following command:
 
-   Create the virtual environment:
+```sh
+git clone https://github.com/luisfuturist/challenge-pgz.git
+cd challenge-pgz/
+```
+
+### Preparing the Virtual Environment
+
+To prepare the virtual environment, you can follow the steps below:
+
+1. **Create the virtual environment**
 
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv .venv
    ```
 
-5. **Install the dependencies**
+2. **Activate the virtual environment**
+
+   ```bash
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+2. **Install the dependencies**
 
    Make sure to install the dependencies:
 
@@ -90,7 +109,34 @@ You will need to have installed an IDE. It's recommended to use [Vscode](https:/
    pip install -r requirements.txt
    ```
 
-## Submitting a Pull Request
+## Contributing
+
+### Committing
+
+1. **Generate a commit message**
+   - Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format, in particular the [Angular Commit Convention](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit).
+   - It's recommended to generate a commit message using AI of the IDE you are using. For example, in VSCode, you can use the `Copilot` extension to generate a commit message.
+   - Check for warnings of already included authors in the commit message.
+
+2. **Commit**
+   - Run `git commit` to commit your changes or use the IDE's commit button.
+
+### Pushing to the Repositories
+
+You can use the following command to push your changes to the repository:
+
+```bash
+git push --set-upstream origin main # or `git push` if you have already set up upstream
+```
+
+### Creating Pull Requests
+
+- Provide a clear description of the changes
+- Include any relevant issue numbers
+- Ensure all tests pass and code quality checks are satisfied
+- Update documentation if necessary
+
+### Submitting a Pull Request
 
 1. **Create a branch**:
    ```bash
@@ -99,9 +145,9 @@ You will need to have installed an IDE. It's recommended to use [Vscode](https:/
 
 2. **Make your changes** following the guidelines
 
-3. **Test your changes** by running the game. See [Running the Game](#running-the-game) for more information.
+3. **Test your changes** by running the game in the development mode if applicable. See [Running the Game](#running-the-game) for more information.
 
-4. **Check code quality**:
+4. **Check code quality (if applicable)**:
    ```bash
    # Format code
    black .
@@ -120,17 +166,37 @@ You will need to have installed an IDE. It's recommended to use [Vscode](https:/
 
 5. **Commit your changes**. See [Committing Code](#committing-code) for more information.
 
-6. **Push and create a pull request**. See [Creating Pull Requests](#creating-pull-requests) for more information.
+6. **Push and create a pull request**. See [Pushing to the Repositories](#pushing-to-the-repositories) and [Creating Pull Requests](#creating-pull-requests) for more information.
 
-## Running the Game
+## Running Standalone Executables
 
-To run the game, you can use the following command:
+> [!WARNING]
+> Make sure you have built the standalone executables. See [Creating Standalone Executables](#creating-standalone-executables) for more information.
+
+To run the standalone executables, you can use the following command:
 
 ```bash
-pgzrun src/main.py
+./dist/wibblo # Linux
 ```
 
+> [!NOTE]
+> We only support Linux for now. See [Creating Standalone Executables](#creating-standalone-executables) for more information.
+
 ## Developing
+
+### Running the Game
+
+> [!WARNING]
+> Make sure to have the virtual environment activated and the dependencies installed. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
+
+To run the game in the development mode, you can use the following command:
+
+```bash
+python src/main.py
+```
+
+> [!TIP]
+> If you want to run the game as an executable, see [Running Standalone Executables](#running-standalone-executables) for more information.
 
 ### Writing Code
 
@@ -148,31 +214,6 @@ For keeping the code organized, we use the following tools:
 - [Black](https://black.readthedocs.io/en/stable/): Used to help us with the code formatting. It automatically fix the linting issues when you save the files. You can also run it manually with `black .`.
 - [Flake8](https://flake8.pycqa.org/en/latest/): Used to lint the code. You can also run it manually with `flake8 .` to check the issues.
 - [Mypy](https://mypy.readthedocs.io/en/stable/): Used to help us with the type safety. It's automatically run before the release. You can also run it manually with `mypy .`. // TODO: Add mypy to the CI/CD pipeline
-
-### Committing Code
-
-1. **Generate a commit message**
-   - Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format, in particular the [Angular Commit Convention](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit).
-   - It's recommended to generate a commit message using AI of the IDE you are using. For example, in VSCode, you can use the `Copilot` extension to generate a commit message.
-   - Check for warnings of already included authors in the commit message.
-
-2. **Commit**
-   - Run `git commit` to commit your changes or use the IDE's commit button.
-
-### Pushing Code to the Repositories
-
-You can use the following command to push your changes to the repository:
-
-```bash
-git push --set-upstream origin main # or `git push` if you have already set up upstream
-```
-
-### Creating Pull Requests
-
-- Provide a clear description of the changes
-- Include any relevant issue numbers
-- Ensure all tests pass and code quality checks are satisfied
-- Update documentation if necessary
 
 ### Getting AI Assistance
 
@@ -208,9 +249,17 @@ You can use the following resources to acquire assets for the game:
 
 ### Creating Standalone Executables
 
+> [!TIP]
+> Make sure to have the virtual environment activated and the dependencies installed. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
+
+To create the standalone executables, you can use the following command:
+
 ```bash
 bash devops/scripts/build.sh
 ```
+
+> [!NOTE]
+> As we are currently using [PyInstaller](https://pyinstaller.org/en/stable/), we can't create standalone executables for Windows and macOS, because it's not a cross-platform compiler.
 
 ### Releasing
 
@@ -222,7 +271,7 @@ bash devops/scripts/build.sh
 
 ## Getting Help
 
-> [!NOTE]
+> [!WARNING]
 > For human-human communication, please prioritize asynchronous communication over real-time communication when possible.
 
 ### Getting Asynchronous Help

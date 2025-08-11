@@ -88,6 +88,7 @@ description: A prioritized list of tasks, features, and ideas for future develop
 
 ### Low priority
 
+- Set up cross-compiling build script for Windows, Linux and macOS
 - Set up CI/CD
 - Fix pgzero stubs
 - Set up hotreload

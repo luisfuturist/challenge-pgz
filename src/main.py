@@ -45,3 +45,6 @@ def on_key_down(key):
     elif key == keys.SPACE:
         # Print a message to the console when space is pressed
         print("Space key pressed!")
+
+
+pgzrun.go()

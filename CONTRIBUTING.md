@@ -26,6 +26,7 @@ Thank you for your interest in contributing to Wibblo! This document provides gu
   - [Creating Standalone Executables](#creating-standalone-executables)
   - [Releasing](#releasing)
 - [Marketing](#marketing)
+- [Testing and Assuring Quality](#testing-and-assuring-quality)
 - [Getting Help](#getting-help)
   - [Getting Asynchronous Help](#getting-asynchronous-help)
   - [Getting Real-Time Help](#getting-real-time-help)
@@ -72,7 +73,7 @@ Here's a brief overview of the documents:
     - [Black](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
     - [Flake8](https://marketplace.visualstudio.com/items?itemName=ms-python.flake8)
 
-4. **Clone the repository**. See [Preparing the Local Repository](#preparing-the-local-repository) for more information.
+4. **Clone the repository**. See [Preparing the Local Repository](#preparing-the-local-repository) for more details.
 
 5. **Prepare the virtual environment**. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
 
@@ -164,13 +165,13 @@ git push --set-upstream origin main # or `git push` if you have already set up u
 
    See [Checking Code Quality](#checking-code-quality) for more information.
 
-5. **Commit your changes**. See [Committing Code](#committing-code) for more information.
+5. **Commit your changes**. See [Committing](#committing) for more information.
 
 6. **Push and create a pull request**. See [Pushing to the Repositories](#pushing-to-the-repositories) and [Creating Pull Requests](#creating-pull-requests) for more information.
 
 ## Running Standalone Executables
 
-> [!WARNING]
+> [!IMPORTANT]
 > Make sure you have built the standalone executables. See [Creating Standalone Executables](#creating-standalone-executables) for more information.
 
 To run the standalone executables, you can use the following command:
@@ -186,7 +187,7 @@ To run the standalone executables, you can use the following command:
 
 ### Running the Game
 
-> [!WARNING]
+> [!IMPORTANT]
 > Make sure to have the virtual environment activated and the dependencies installed. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
 
 To run the game in the development mode, you can use the following command:
@@ -249,7 +250,7 @@ You can use the following resources to acquire assets for the game:
 
 ### Creating Standalone Executables
 
-> [!TIP]
+> [!IMPORTANT]
 > Make sure to have the virtual environment activated and the dependencies installed. See [Preparing the Virtual Environment](#preparing-the-virtual-environment) for more information.
 
 To create the standalone executables, you can use the following command:
@@ -268,6 +269,10 @@ bash devops/scripts/build.sh
 ## Marketing
 
 // TODO: Add marketing section
+
+## Testing and Assuring Quality
+
+// TODO: Add testing and assuring quality documentation
 
 ## Getting Help
 

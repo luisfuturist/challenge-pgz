@@ -1,0 +1,5 @@
+[flake8]
+builtins = Actor,Rect,ZRect,animate,clock,exit,images,keyboard,keymods,keys,mouse,music,screen,sounds,storage,tone
+max-line-length = 88
+extend-ignore = E203, E704
+extend-exclude = .venv,.vscode,assets,docs,project

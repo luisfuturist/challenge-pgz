@@ -82,6 +82,16 @@ description: A prioritized list of tasks, features, and ideas for future develop
 
 ### High priority
 
+- Fix build script
+
 ### Medium priority
 
 ### Low priority
+
+- Set up CI/CD
+- Fix pgzero stubs
+- Set up hotreload
+
+### Project Management
+
+- Add roadmap

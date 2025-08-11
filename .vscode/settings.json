@@ -1,33 +1,54 @@
 {
   "files.exclude": {
-    "**/.git": true,
-    "**/dist": true,
+    ".vscode": false,
     "**/__pycache__": true,
-    ".vscode": false
+    ".mypy_cache": true
   },
   "search.exclude": {
-    "**/__pycache__": true
+    "**/__pycache__": true,
+    "**/.mypy_cache": true
   },
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
-    "README.md": "CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, LICENSE",
-  },
-  // Auto fix
-  "editor.tabSize": 2,
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.organizeImports": "always"
-  },
-  "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  "editor.quickSuggestions": {
-    "other": true,
-    "comments": false,
-    "strings": false
+    "README.md": "CONTRIBUTING.md, SECURITY.md, LICENSE"
   },
   "files.associations": {
     "**/*.md": "markdown"
-  }
+  },
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "isort.args": [
+    "--profile",
+    "black"
+  ],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportUndefinedVariable": "none"
+  },
+  "mypy-type-checker.ignorePatterns": [
+    ".direnv/*",
+    "docs/*",
+    "*generated/*",
+    "*<common-submodule-name>/*",
+    "*cache*",
+    "build/*",
+    "dist/*"
+  ],
+  "mypy-type-checker.importStrategy": "fromEnvironment",
+  "mypy-type-checker.reportingScope": "workspace",
+  "mypy-type-checker.preferDaemon": false,
+  "mypy-type-checker.args": [
+    "--config-file=${workspaceFolder}/mypy.ini"
+  ],
+  "python.terminal.activateEnvironment": false,
+  "python.defaultInterpreterPath": "${env:VIRTUAL_ENV}"
 }

@@ -1,11 +1,15 @@
+[Portuguese (BR)](./README.pt-BR.md) | English
+
 # Wibblo
 
-## Quick Start
+Wibblo is prototype of a fast-paced 2D platformer survival game where you bend time to outsmart relentless enemies.
 
-* 1) Python 3.10+ recommended
+// TODO: Add a video of the game
 
-* 2) Run the game:
+## Installing
 
-    ```bash
-    pgzrun src/main.py
-    ```
+// TODO: Add documentation on how to install the game
+
+---
+
+[Contribute](./CONTRIBUTING.md) • [License](./LICENSE) • [Security](./SECURITY.md)

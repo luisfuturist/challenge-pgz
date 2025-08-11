@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "yzhang.markdown-all-in-one",
+    "eamodio.gitlens",
+    "GitHub.copilot",
+    "ms-python.python",
+    "ms-python.isort",
+    "ms-python.vscode-pylance",
+    "ms-python.mypy-type-checker",
+    "ms-python.black-formatter",
+    "ms-python.flake8"
+  ]
+}

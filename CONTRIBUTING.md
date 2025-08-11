@@ -102,7 +102,7 @@ To prepare the virtual environment, you can follow the steps below:
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-2. **Install the dependencies**
+3. **Install the dependencies**
 
    Make sure to install the dependencies:
 
@@ -117,7 +117,6 @@ To prepare the virtual environment, you can follow the steps below:
 1. **Generate a commit message**
    - Use the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format, in particular the [Angular Commit Convention](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit).
    - It's recommended to generate a commit message using AI of the IDE you are using. For example, in VSCode, you can use the `Copilot` extension to generate a commit message.
-   - Check for warnings of already included authors in the commit message.
 
 2. **Commit**
    - Run `git commit` to commit your changes or use the IDE's commit button.

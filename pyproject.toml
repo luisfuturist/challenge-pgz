@@ -1,0 +1,86 @@
+[project]
+name = "wibblo"
+version = "0.1.0-next.0"
+description = "Prototype of a fast-paced 2D platformer survival game where you bend time to outsmart relentless enemies."
+authors = [
+  { name = "Luis Emidio", email = "luisfuturist@gmail.com" }
+]
+dependencies = ["pgzero"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = "E203,E704"
+extend-exclude = ".venv,.vscode,assets,docs,project"
+builtins = "Actor,Rect,ZRect,animate,clock,exit,images,keyboard,keymods,keys,mouse,music,screen,sounds,storage,tone"
+
+[tool.mypy]
+python_version = "3.11"
+# Useful strictness
+disallow_untyped_defs = false
+no_implicit_optional = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+pretty = true
+
+[[tool.mypy.overrides]]
+# Third‑party runtime libs without type stubs
+module = ["pgzrun.*", "pgzero.*", "pygame.*"]
+ignore_missing_imports = true
+
+
+[tool.semantic_release]
+# bump
+version_toml = ["pyproject.toml:project.version"]
+allow_zero_version = true # remove this to make the first version a major release
+major_on_zero = false # change to true to make the first version a major release
+logging_use_named_masks = false
+[tool.semantic_release.branches.main]
+prerelease_token = "next"
+
+# changelog
+[tool.semantic_release.changelog]
+exclude_commit_patterns = []
+mode = "update"
+insertion_flag = "<!-- version list -->"
+mask_initial_release = false
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "project/CHANGELOG.md"
+output_format = "md"
+template_dir = "devops/templates"
+[tool.semantic_release.changelog.environment]
+block_start_string = "{%"
+block_end_string = "%}"
+variable_start_string = "{{"
+variable_end_string = "}}"
+comment_start_string = "{#"
+comment_end_string = "#}"
+trim_blocks = false
+lstrip_blocks = false
+newline_sequence = "\n"
+keep_trailing_newline = false
+extensions = []
+autoescape = false
+
+# build
+build_command_env = []
+build_command = "source .venv/bin/activate && bash ./devops/scripts/build.sh"
+
+# git
+commit_message = "Release {version}"
+commit_parser = "conventional"
+no_git_verify = true # We should keep it set to true to prevent the automated version commit from being blocked by any custom Git hooks that may be in place.
+tag_format = "v{version}"
+[tool.semantic_release.commit_author]
+env = "GIT_COMMIT_AUTHOR"
+default = "semantic-release <semantic-release>"
+
+# github
+assets = ["build/wibblo"]
+[tool.semantic_release.remote]
+type = "github"
+ignore_token_for_push = false
+insecure = false
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]

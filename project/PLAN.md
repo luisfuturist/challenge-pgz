@@ -8,7 +8,7 @@ Making a professional indie game involves a structured process, even with a smal
     * This was brainstormed using AI, especially Gemini and ChatGPT via chats and calls.
     * The result was the item below.
 * [x] [**Game Design Document (GDD):**](./notes/gdd.md) Create a living document that details all aspects of the game, including mechanics, story, art style, and target audience.
-* [x] **Prototyping:** Build a small, playable version of the core gameplay loop to test if the idea is fun.
+* [ ] **Prototyping:** Build a small, playable version of the core gameplay loop to test if the idea is fun.
   * This helps to validate the concept early on.
 
 ## Production (The Grind)

@@ -4,6 +4,11 @@ description: Tasks and items for the release.
 
 # TODO
 
+- Setup CD
+  - Check quality before release: `"isort . && black . && flake8 . && mypy ."`
+  - Config changelog (add unreleased section, update version in title)
+  - Config GitHub release name and notes
+
 - [ ] Look for TODO comments
 
 ## 0.1.0-0 - Core Gameplay Implementation

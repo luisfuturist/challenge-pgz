@@ -82,9 +82,11 @@ description: A prioritized list of tasks, features, and ideas for future develop
 
 ### High priority
 
-- Fix build script
+- Fix build script assets
 
 ### Medium priority
+
+- Refactor using an ECS library
 
 ### Low priority
 

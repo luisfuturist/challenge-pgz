@@ -8,14 +8,14 @@ Making a professional indie game involves a structured process, even with a smal
     * This was brainstormed using AI, especially Gemini and ChatGPT via chats and calls.
     * The result was the item below.
 * [x] [**Game Design Document (GDD):**](./notes/gdd.md) Create a living document that details all aspects of the game, including mechanics, story, art style, and target audience.
-* [ ] **Prototyping:** Build a small, playable version of the core gameplay loop to test if the idea is fun.
+* [x] **Prototyping:** Build a small, playable version of the core gameplay loop to test if the idea is fun.
   * This helps to validate the concept early on.
 
 ## Production (The Grind)
 
+* [x] **Project Management:** Use tools like a backlog to organize tasks and manage the timeline.
 * [ ] **Development:** Write the code, create/get the art assets, compose/get the music and sound effects.
   * This is the longest phase, where the game is actually built.
-* [ ] **Project Management:** Use tools like a backlog to organize tasks and manage the timeline.
 
 ## Post-Production (The Polish)
 

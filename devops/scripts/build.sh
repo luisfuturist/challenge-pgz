@@ -9,5 +9,5 @@ if [ -z "$VIRTUAL_ENV" ]; then
 fi
 
 echo 'Building the game with PyInstaller...'
-pyinstaller --collect-all pgzero --windowed --onefile --clean src/main.py --name wibblo
+pyinstaller --collect-all pgzero --windowed --onefile --clean src/main.py --name wibblo --add-data "src/images:images"
 # pyinstaller --clean wibblo.spec

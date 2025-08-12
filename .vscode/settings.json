@@ -1,17 +1,22 @@
 {
   "files.exclude": {
+    ".venv": true,
     ".vscode": false,
     "**/__pycache__": true,
-    ".mypy_cache": true
+    ".mypy_cache": true,
+    "build": true,
   },
   "search.exclude": {
+    ".venv": true,
     "**/__pycache__": true,
-    "**/.mypy_cache": true
+    "**/.mypy_cache": true,
+    "build": true
   },
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
-    "README.md": "CONTRIBUTING.md, SECURITY.md, LICENSE"
+    "README.md": "CONTRIBUTING.md, SECURITY.md, LICENSE, README.*",
+    "wibblo.spec": "requirements.txt, .flake8, .gitignore"
   },
   "files.associations": {
     "**/*.md": "markdown"
@@ -25,7 +30,7 @@
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit"
-    }
+    },
   },
   "isort.args": [
     "--profile",

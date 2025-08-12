@@ -23,6 +23,92 @@ GRAVITY = 1200.0
 JUMP_FORCE = -500.0
 MOVE_SPEED = 300.0
 
+# Audio toggles
+MUSIC_ENABLED = True
+SFX_ENABLED = True
+
+# endregion
+
+# region Menu
+
+MENU_STATE = "menu"  # "menu" or "game"
+
+
+class MenuButton:
+    def __init__(self, label: str, x: int, y: int, w: int, h: int):
+        self.label = label
+        self.rect = Rect(x, y, w, h)
+
+    def contains(self, pos: Tuple[int, int]) -> bool:
+        return self.rect.collidepoint(pos)
+
+
+# Create menu layout
+BUTTON_W = 300
+BUTTON_H = 50
+BUTTON_GAP = 16
+MENU_X = (WIDTH - BUTTON_W) // 2
+MENU_Y = (HEIGHT - (BUTTON_H * 4 + BUTTON_GAP * 3)) // 2
+
+btn_start = MenuButton("Começar o jogo", MENU_X, MENU_Y, BUTTON_W, BUTTON_H)
+btn_music = MenuButton("", MENU_X, MENU_Y + (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H)
+btn_sfx = MenuButton(
+    "", MENU_X, MENU_Y + 2 * (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H
+)
+btn_exit = MenuButton(
+    "Sair", MENU_X, MENU_Y + 3 * (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H
+)
+
+
+def _menu_labels_update():
+    btn_music.label = f"Música: {'Ligada' if MUSIC_ENABLED else 'Desligada'}"
+    btn_sfx.label = f"Sons: {'Ligados' if SFX_ENABLED else 'Desligados'}"
+
+
+_menu_labels_update()
+
+
+def apply_music_state():
+    if MUSIC_ENABLED:
+        # Loop background track
+        try:
+            sounds.music_space_cadet.play(-1)
+        except Exception:
+            pass
+    else:
+        try:
+            sounds.music_space_cadet.stop()
+        except Exception:
+            pass
+
+
+# Apply initial music state
+apply_music_state()
+
+
+def draw_menu():
+    screen.clear()
+    screen.fill((20, 20, 40))
+
+    # Title
+    screen.draw.text(
+        TITLE,
+        center=(WIDTH // 2, MENU_Y - 60),
+        fontsize=64,
+        color=(240, 240, 255),
+    )
+
+    for btn in (btn_start, btn_music, btn_sfx, btn_exit):
+        screen.draw.filled_rect(btn.rect, (60, 60, 90))
+        screen.draw.rect(btn.rect, (220, 220, 255))
+        screen.draw.text(
+            btn.label,
+            center=btn.rect.center,
+            fontsize=28,
+            color=(255, 255, 255),
+        )
+
+
 # endregion
 
 # region Components
@@ -109,6 +195,22 @@ class Controls(Component):
         self.left = False
         self.right = False
         self.jump = False
+
+
+class Footsteps(Component):
+    def __init__(
+        self,
+        sound_names: List[str],
+        sps: int = 6,  # sound per second
+    ):
+        self.sound_names = sound_names
+        self.sps = sps
+        self.timer = 0.0
+        self.sound_index = -1
+        self.last_index = -1
+        self.was_walking = False
+        # Dedicated RNG to avoid interference from global seeding elsewhere
+        self.rng = random.Random()
 
 
 # endregion
@@ -314,6 +416,54 @@ class WalkingAnimationSystem(System):
                 anim.frame_index = (anim.frame_index + 1) % (len(anim.frames) - 1)
 
 
+class FootstepSystem(System):
+    def update(self, dt: float):
+        entities = self.world.get_matching_entities({Player, Velocity, Footsteps})
+
+        for entity in entities:
+            player = self.world.get_component(entity, Player)
+            velocity = self.world.get_component(entity, Velocity)
+            footsteps = self.world.get_component(entity, Footsteps)
+
+            if not (player and velocity and footsteps):
+                continue
+
+            if player.on_ground and player.walking:
+                frame_time = 1.0 / max(footsteps.sps, 0.0001)
+                footsteps.timer += dt
+                # On walking start, play immediately and skip scheduled play this frame
+                if not footsteps.was_walking:
+                    footsteps.was_walking = True
+                    self._play_footstep_sound(footsteps)
+                    footsteps.timer = 0.0
+                    continue
+
+                while footsteps.timer >= frame_time:
+                    footsteps.timer -= frame_time
+                    self._play_footstep_sound(footsteps)
+            else:
+                footsteps.timer = 0.0
+                footsteps.was_walking = False
+
+    def _play_footstep_sound(self, footsteps):
+        names = footsteps.sound_names
+        if not names or not SFX_ENABLED:
+            return
+        count = len(names)
+        if count == 1:
+            idx = 0
+        else:
+            idx = footsteps.rng.randrange(count)
+            if idx == footsteps.last_index:
+                idx = (idx + 1) % count
+        name = names[idx]
+        sound_obj = getattr(sounds, name, None)
+        if sound_obj:
+            footsteps.sound_index = idx
+            footsteps.last_index = idx
+            sound_obj.play()
+
+
 class RenderSystem(System):
     def __init__(self, world):
         super().__init__(world)
@@ -371,6 +521,7 @@ class Game:
         self.world.add_system(MovementSystem(self.world))
         self.world.add_system(CollisionSystem(self.world))
         self.world.add_system(WalkingAnimationSystem(self.world))
+        self.world.add_system(FootstepSystem(self.world))
         self.world.add_system(RenderSystem(self.world))
 
         self._create_background()
@@ -425,8 +576,9 @@ class Game:
 
     def _create_map(self):
         """
-        Create a platform of grass starting a little below the middle (1 tile on top),
-        and fill all rows below with dirt (with rare variations).
+        Create a platform of grass starting a little below the middle
+        (1 tile on top), and fill all rows below with dirt (with rare
+        variations).
         """
         random.seed(42)
 
@@ -503,21 +655,70 @@ class Game:
                 fps=24,
             ),
         )
+        self.world.add_component(
+            self.player,
+            Footsteps(
+                [
+                    "footstep_wood_000",
+                    "footstep_wood_001",
+                    "footstep_wood_002",
+                    "footstep_wood_003",
+                    "footstep_wood_004",
+                ],
+            ),
+        )
 
 
-game = Game()
+# Global game instance created on demand
+_game: Game | None = None
+
+
+# Pygame Zero hooks
 
 
 def draw():
-    game.draw()
+    if MENU_STATE == "menu":
+        draw_menu()
+    else:
+        if _game:
+            _game.draw()
 
 
 def update(dt):
-    game.update(dt)
+    if MENU_STATE == "menu":
+        return
+    if _game:
+        _game.update(dt)
 
 
 def on_key_down(key):
     if key == keys.ESCAPE:
+        quit()
+
+
+def on_mouse_down(pos):
+    global MENU_STATE, MUSIC_ENABLED, SFX_ENABLED, _game
+    if MENU_STATE != "menu":
+        return
+
+    if btn_start.contains(pos):
+        MENU_STATE = "game"
+        if _game is None:
+            _game = Game()
+        return
+
+    if btn_music.contains(pos):
+        MUSIC_ENABLED = not MUSIC_ENABLED
+        _menu_labels_update()
+        apply_music_state()
+        return
+
+    if btn_sfx.contains(pos):
+        SFX_ENABLED = not SFX_ENABLED
+        _menu_labels_update()
+        return
+
+    if btn_exit.contains(pos):
         quit()
 
 

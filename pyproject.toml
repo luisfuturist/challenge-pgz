@@ -1,6 +1,6 @@
 [project]
 name = "wibblo"
-version = "0.1.0-next.0"
+version = "0.1.0.dev0+next.0"
 description = "Prototype of a fast-paced 2D platformer survival game where you bend time to outsmart relentless enemies."
 authors = [
   { name = "Luis Emidio", email = "luisfuturist@gmail.com" }
@@ -9,9 +9,13 @@ dependencies = ["pgzero"]
 
 [tool.flake8]
 max-line-length = 88
-extend-ignore = "E203,E704"
-extend-exclude = ".venv,.vscode,assets,docs,project"
-builtins = "Actor,Rect,ZRect,animate,clock,exit,images,keyboard,keymods,keys,mouse,music,screen,sounds,storage,tone"
+extend-ignore = ["E203", "E704"]
+extend-exclude = [".venv", ".vscode", "assets", "docs", "project"]
+builtins = [
+  "Actor", "Rect", "ZRect", "animate", "clock", "exit", "images",
+  "keyboard", "keymods", "keys", "mouse", "music", "screen", "sounds",
+  "storage", "tone"
+]
 
 [tool.mypy]
 python_version = "3.11"

@@ -16,7 +16,7 @@
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
     "README.md": "CONTRIBUTING.md, SECURITY.md, LICENSE, README.*",
-    "pyproject.toml": "wibblo.spec, requirements.txt, .flake8, .gitignore"
+    "pyproject.toml": "wibblo.spec, requirements.txt, .gitignore, setup.cfg"
   },
   "files.associations": {
     "**/*.md": "markdown"

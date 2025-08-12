@@ -1,14 +1,25 @@
-[Portuguese (BR)](./README.pt-BR.md) | English
-
 # Wibblo
 
-Wibblo is prototype of a fast-paced 2D platformer survival game where you bend time to outsmart relentless enemies.
+Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D acelerado, onde você dobra o tempo para enganar inimigos implacáveis.
 
-// TODO: Add a video of the game
+// TODO: Adicionar um vídeo do jogo
 
-## Installing
+- Desenvolvido com [pgzero](https://github.com/pgzero/pgzero) e módulos internos como `random`, `math` e `typing`
+- Mecânicas de plataforma
+- Menu com botões clicáveis: Começar o jogo, música e sons ligados/desligados e sair
+- Música e efeitos sonoros
+- Vários inimigos
+- Inimigos se movem em seu território
+- Sistema de movimento e animações implementado com classes
+- Herói e inimigos animados por sprites (ex: andando)
+- Código compatível com PEP8 utilizando [black](https://github.com/psf/black) e [flake8](https://github.com/PyCQA/flake8)
+- Sem bugs (nenhum bug encontrado)
 
-// TODO: Add documentation on how to install the game
+## Instalação
+
+// TODO: Adicionar documentação de como instalar o jogo
+- Link to build upload to Google Drive
+- Instructions how to run (on Linux only for now)
 
 ---
 

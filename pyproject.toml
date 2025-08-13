@@ -81,7 +81,7 @@ env = "GIT_COMMIT_AUTHOR"
 default = "semantic-release <semantic-release>"
 
 # github
-assets = ["build/wibblo"]
+assets = ["./dist/wibblo"]
 [tool.semantic_release.remote]
 type = "github"
 ignore_token_for_push = false

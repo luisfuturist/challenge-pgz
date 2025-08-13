@@ -1,8 +1,14 @@
 # Wibblo
 
-Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D acelerado, onde você dobra o tempo para enganar inimigos implacáveis.
+Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D feito em Python.
 
-// TODO: Adicionar um vídeo do jogo
+<video width="800" height="600" controls>
+  <source src="docs/demo.mp4" type="video/mp4">
+</video>
+
+> Demonstração em vídeo do gameplay do Wibblo
+
+---
 
 - Desenvolvido com [pgzero](https://github.com/pgzero/pgzero) e módulos internos como `random`, `math` e `typing`
 - Mecânicas de plataforma
@@ -16,9 +22,20 @@ Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D acelerado,
 
 ## Instalação
 
-// TODO: Adicionar documentação de como instalar o jogo
-- Link to build upload to Google Drive
-- Instructions how to run (on Linux only for now)
+Para jogar o protótipo do Wibblo, basta baixar o executável para Linux disponível [neste link](https://drive.google.com/file/d/1BbqR4G8TJpzmUQwI4AMJjN8NTN-iyCzA/view?usp=sharing).
+
+**Instruções:**
+1. Faça o download do arquivo.
+2. Dê permissão de execução ao arquivo baixado:
+   ```bash
+   chmod +x wibblo
+   ```
+3. Execute o jogo no terminal:
+   ```bash
+   ./wibblo
+   ```
+
+> *Atualmente, o executável está disponível apenas para Linux. Para outras plataformas, consulte as instruções de compilação no repositório ou abra uma issue para solicitar suporte.*
 
 ---
 

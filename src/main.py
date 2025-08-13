@@ -73,6 +73,7 @@ class Sprite(Component):
         layer: int = 0,
         offset: Tuple[int, int] = (0, 0),
         anchor: Tuple[str, str] = ("left", "top"),
+        mirror_offset_on_flip: bool = True,
     ):
         self.texture = texture
         self.width = width
@@ -80,6 +81,7 @@ class Sprite(Component):
         self.layer = layer
         self.offset = offset
         self.anchor = anchor
+        self.mirror_offset_on_flip = mirror_offset_on_flip
 
 
 class Animation(Component):
@@ -88,11 +90,13 @@ class Animation(Component):
         frames: List[str],
         fps: float = 10,
         frame_index: int = 0,
+        frame_sizes: List[Tuple[int, int]] | None = None,
     ):
         self.frames = frames
         self.fps = fps
         self.frame_index = frame_index
         self.timer = 0
+        self.frame_sizes = frame_sizes or []
 
 
 class WalkingAnimation(Animation):
@@ -242,8 +246,6 @@ class CollisionResolutionSystem(System):
                 continue
 
             on_ground = False
-            # Capture vertical velocity before resolving collisions for stomp
-            vel_vy_before = vel.vy
 
             # World boundary collisions (left/right)
             if pos.x < 0:
@@ -285,8 +287,10 @@ class CollisionResolutionSystem(System):
                 if not (tpos and tcol):
                     continue
 
-                # Do not move enemies when colliding with the player
-                if enemy_self is not None and self.world.get_component(target, Player):
+                # Completely skip resolution between player and enemy
+                if (player is not None and self.world.get_component(target, Enemy)) or (
+                    enemy_self is not None and self.world.get_component(target, Player)
+                ):
                     continue
 
                 # AABB overlap test using center/half-size method
@@ -312,7 +316,14 @@ class CollisionResolutionSystem(System):
                         pos.x += px
                     else:
                         pos.x -= px
-                    vel.vx = 0
+                    # Preserve walking when colliding with enemy as player
+                    if (
+                        player is not None
+                        and self.world.get_component(target, Enemy) is not None
+                    ):
+                        pass
+                    else:
+                        vel.vx = 0
                 else:
                     # Vertical resolution
                     if dy > 0:
@@ -324,37 +335,6 @@ class CollisionResolutionSystem(System):
                         pos.y -= py
                         vel.vy = 0
                         on_ground = True
-                        # If the impactor is the player and target is enemy,
-                        # treat as a stomp
-                        if player is not None:
-                            enemy = self.world.get_component(target, Enemy)
-                            if enemy is not None:
-                                # Stomp only if player was falling
-                                # before collision resolution
-                                if vel_vy_before > 0:
-                                    # Bounce the player and mark not on ground
-                                    vel.vy = JUMP_FORCE * 0.5
-                                    on_ground = False
-                                    # Kill enemy: show dead sprite and
-                                    # remove behavior/collision
-                                    tsprite = self.world.get_component(target, Sprite)
-                                    if tsprite:
-                                        tsprite.texture = "blinky_dead"
-                                    # Remove systems-affecting components
-                                    self.world.remove_component(target, Enemy)
-                                    self.world.remove_component(
-                                        target, WalkingAnimation
-                                    )
-                                    self.world.remove_component(target, Impactor)
-                                    self.world.remove_component(target, CollisionTarget)
-                                    # Ensure enemy will fall out of screen
-                                    tvel = self.world.get_component(target, Velocity)
-                                    if tvel:
-                                        tvel.vx = 0
-                                        # start falling from rest
-                                        tvel.vy = 0
-                                    # Keep gravity so it falls through
-                                    self.world.add_component(target, Dead())
 
             if player is not None:
                 # Detect landing (transition from air to ground)
@@ -367,6 +347,60 @@ class CollisionResolutionSystem(System):
                     player.was_on_ground = on_ground
                     player.landed = False
                 player.on_ground = on_ground
+
+
+class CombatSystem(System):
+    def update(self, dt: float):
+        # Handle player-enemy combat based on flags (no physical resolution)
+        players = self.world.get_matching_entities(
+            {Player, Impactor, Position, Velocity, CollisionTarget}
+        )
+        if not players:
+            return
+        p = players[0]
+        ppos = self.world.get_component(p, Position)
+        pvel = self.world.get_component(p, Velocity)
+        pcol = self.world.get_component(p, CollisionTarget)
+        pimp = self.world.get_component(p, Impactor)
+        if not (ppos and pvel and pcol and pimp):
+            return
+
+        # Stomp kill: player damaging enemy from top only when falling with overlap depth
+        if pimp.colliding_with_enemy_top and pvel.vy > 0:
+            enemies = self.world.get_matching_entities(
+                {Enemy, Position, CollisionTarget}
+            )
+            for e in enemies:
+                epos = self.world.get_component(e, Position)
+                ecol = self.world.get_component(e, CollisionTarget)
+                if not (epos and ecol):
+                    continue
+                ax1, ay1 = ppos.x, ppos.y
+                ax2, ay2 = ppos.x + pcol.width, ppos.y + pcol.height
+                bx1, by1 = epos.x, epos.y
+                bx2, by2 = epos.x + ecol.width, epos.y + ecol.height
+                if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
+                    # Ensure sufficient vertical overlap to count as stomp
+                    overlap_y = min(ay2, by2) - max(ay1, by1)
+                    min_overlap = min(pcol.height, ecol.height) * 0.1
+                    if overlap_y <= min_overlap:
+                        continue
+                    # Bounce player
+                    pvel.vy = JUMP_FORCE * 0.5
+                    # Kill enemy and let it fall off-screen
+                    tsprite = self.world.get_component(e, Sprite)
+                    if tsprite:
+                        tsprite.texture = "blinky_dead"
+                    self.world.remove_component(e, Enemy)
+                    self.world.remove_component(e, WalkingAnimation)
+                    self.world.remove_component(e, Impactor)
+                    self.world.remove_component(e, CollisionTarget)
+                    tvel = self.world.get_component(e, Velocity)
+                    if tvel:
+                        tvel.vx = 0
+                        tvel.vy = 0
+                    self.world.add_component(e, Dead())
+                    break
 
 
 class ControlsSystem(System):
@@ -534,12 +568,20 @@ class EnemySpawnSystem(System):
                 anchor=("left", "top"),
                 offset=(0, 0),
                 layer=900,
+                mirror_offset_on_flip=False,
             ),
         )
         self.world.add_component(
             e,
             WalkingAnimation(
-                ["blinky_walk01", "blinky_walk02", "blinky_walk03"], fps=10
+                [
+                    "blinky_walk01",
+                    "blinky_walk02",
+                    "blinky_walk03",
+                ],
+                fps=10,
+                # Optionally pass explicit frame sizes here if desired
+                # frame_sizes=[(32, 44), (32, 42), (49, 38)],
             ),
         )
 
@@ -650,9 +692,11 @@ class CollisionDetectionSystem(System):
                             px = (col_a.width / 2 + col_b.width / 2) - abs(dx)
                             dy = cy_a - cy_b
                             py = (col_a.height / 2 + col_b.height / 2) - abs(dy)
-                            if py <= px and dy < 0:
+                            # Add small overlap threshold to avoid grazing registering as top
+                            min_overlap = min(col_a.height, col_b.height) * 0.1
+                            if py < px and dy < 0 and py > min_overlap:
                                 imp_a.colliding_with_enemy_top = True
-                            elif px < py:
+                            elif px < py and px > min_overlap:
                                 imp_a.colliding_with_enemy_side = True
                     col_b.colliding = True
 
@@ -663,9 +707,33 @@ class EnemySpriteSystem(System):
         for e in ents:
             anim = self.world.get_component(e, WalkingAnimation)
             sprite = self.world.get_component(e, Sprite)
+            col = self.world.get_component(e, CollisionTarget)
             if anim and sprite and anim.frames:
                 idx = max(min(anim.frame_index, len(anim.frames) - 1), 0)
-                sprite.texture = anim.frames[idx]
+                frame_name = anim.frames[idx]
+                sprite.texture = frame_name
+                # Determine current frame size
+                fw = fh = None
+                if idx < len(anim.frame_sizes):
+                    try:
+                        fw, fh = anim.frame_sizes[idx]
+                    except Exception:
+                        fw = fh = None
+                if fw is None or fh is None:
+                    tex = getattr(images, frame_name, None)
+                    try:
+                        fw = tex.get_width()
+                        fh = tex.get_height()
+                    except Exception:
+                        fw, fh = sprite.width, sprite.height
+                # Update sprite width/height to match frame
+                sprite.width = fw
+                sprite.height = fh
+                # Center horizontally in collision box; bottom align
+                if col:
+                    off_x = int((col.width - fw) / 2)
+                    off_y = int(col.height - fh)
+                    sprite.offset = (off_x, off_y)
 
 
 class ContactDamageSystem(System):
@@ -751,7 +819,7 @@ class RenderSystem(System):
             offset_x = sprite.offset[0]
             offset_y = sprite.offset[1]
 
-            if flipx and flipx.flip:
+            if flipx and flipx.flip and sprite.mirror_offset_on_flip:
                 offset_x = -offset_x
 
             screen.blit(texture, (pos.x + offset_x, pos.y + offset_y))
@@ -838,6 +906,7 @@ class Game:
         self.world.add_system(GravitySystem(self.world))
         self.world.add_system(MovementSystem(self.world))
         self.world.add_system(CollisionDetectionSystem(self.world))
+        self.world.add_system(CombatSystem(self.world))
         self.world.add_system(CollisionResolutionSystem(self.world))
         self.world.add_system(LandSoundSystem(self.world))
         self.world.add_system(DifficultySystem(self.world))

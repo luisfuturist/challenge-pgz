@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('src/images', 'images')]
+datas = [('src/images', 'images'), ('src/sounds', 'sounds'), ('src/fonts', 'fonts')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pgzero')

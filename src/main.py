@@ -1,5 +1,5 @@
 import random
-from typing import List, Tuple
+from typing import List, Literal, Tuple
 
 import pgzrun
 import pygame
@@ -15,6 +15,10 @@ TITLE = "Wibblo"
 
 # Constants
 TILE_SIZE = 64
+CURSOR_SIZE = 32
+BUTTON_WIDTH = 192
+BUTTON_HEIGHT = 64
+
 PLAYER_WIDTH = 70
 PLAYER_HEIGHT = 94
 BACKGROUND_WIDTH = 640
@@ -26,88 +30,6 @@ MOVE_SPEED = 300.0
 # Audio toggles
 MUSIC_ENABLED = True
 SFX_ENABLED = True
-
-# endregion
-
-# region Menu
-
-MENU_STATE = "menu"  # "menu" or "game"
-
-
-class MenuButton:
-    def __init__(self, label: str, x: int, y: int, w: int, h: int):
-        self.label = label
-        self.rect = Rect(x, y, w, h)
-
-    def contains(self, pos: Tuple[int, int]) -> bool:
-        return self.rect.collidepoint(pos)
-
-
-# Create menu layout
-BUTTON_W = 300
-BUTTON_H = 50
-BUTTON_GAP = 16
-MENU_X = (WIDTH - BUTTON_W) // 2
-MENU_Y = (HEIGHT - (BUTTON_H * 4 + BUTTON_GAP * 3)) // 2
-
-btn_start = MenuButton("Começar o jogo", MENU_X, MENU_Y, BUTTON_W, BUTTON_H)
-btn_music = MenuButton("", MENU_X, MENU_Y + (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H)
-btn_sfx = MenuButton(
-    "", MENU_X, MENU_Y + 2 * (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H
-)
-btn_exit = MenuButton(
-    "Sair", MENU_X, MENU_Y + 3 * (BUTTON_H + BUTTON_GAP), BUTTON_W, BUTTON_H
-)
-
-
-def _menu_labels_update():
-    btn_music.label = f"Música: {'Ligada' if MUSIC_ENABLED else 'Desligada'}"
-    btn_sfx.label = f"Sons: {'Ligados' if SFX_ENABLED else 'Desligados'}"
-
-
-_menu_labels_update()
-
-
-def apply_music_state():
-    if MUSIC_ENABLED:
-        # Loop background track
-        try:
-            sounds.music_space_cadet.play(-1)
-        except Exception:
-            pass
-    else:
-        try:
-            sounds.music_space_cadet.stop()
-        except Exception:
-            pass
-
-
-# Apply initial music state
-apply_music_state()
-
-
-def draw_menu():
-    screen.clear()
-    screen.fill((20, 20, 40))
-
-    # Title
-    screen.draw.text(
-        TITLE,
-        center=(WIDTH // 2, MENU_Y - 60),
-        fontsize=64,
-        color=(240, 240, 255),
-    )
-
-    for btn in (btn_start, btn_music, btn_sfx, btn_exit):
-        screen.draw.filled_rect(btn.rect, (60, 60, 90))
-        screen.draw.rect(btn.rect, (220, 220, 255))
-        screen.draw.text(
-            btn.label,
-            center=btn.rect.center,
-            fontsize=28,
-            color=(255, 255, 255),
-        )
-
 
 # endregion
 
@@ -178,6 +100,8 @@ class Player(Component):
         self.on_ground = True
         self.at_boundary = False
         self.walking = False
+        self.was_on_ground = True
+        self.landed = False
 
 
 class CollisionTarget(Component):
@@ -211,6 +135,11 @@ class Footsteps(Component):
         self.was_walking = False
         # Dedicated RNG to avoid interference from global seeding elsewhere
         self.rng = random.Random()
+
+
+class Cursor(Component):
+    def __init__(self, cursor_type: Literal["default", "pointer"] = "default"):
+        self.cursor_type = cursor_type
 
 
 # endregion
@@ -332,6 +261,15 @@ class CollisionSystem(System):
                         on_ground = True
 
             if player is not None:
+                # Detect landing (transition from air to ground)
+                try:
+                    if (not player.was_on_ground) and on_ground:
+                        player.landed = True
+                    player.was_on_ground = on_ground
+                except AttributeError:
+                    # Backward compatibility if fields are missing
+                    player.was_on_ground = on_ground
+                    player.landed = False
                 player.on_ground = on_ground
 
 
@@ -434,34 +372,31 @@ class FootstepSystem(System):
                 # On walking start, play immediately and skip scheduled play this frame
                 if not footsteps.was_walking:
                     footsteps.was_walking = True
-                    self._play_footstep_sound(footsteps)
+                    play_footstep_sound(footsteps)
                     footsteps.timer = 0.0
                     continue
 
                 while footsteps.timer >= frame_time:
                     footsteps.timer -= frame_time
-                    self._play_footstep_sound(footsteps)
+                    play_footstep_sound(footsteps)
             else:
                 footsteps.timer = 0.0
                 footsteps.was_walking = False
 
-    def _play_footstep_sound(self, footsteps):
-        names = footsteps.sound_names
-        if not names or not SFX_ENABLED:
-            return
-        count = len(names)
-        if count == 1:
-            idx = 0
-        else:
-            idx = footsteps.rng.randrange(count)
-            if idx == footsteps.last_index:
-                idx = (idx + 1) % count
-        name = names[idx]
-        sound_obj = getattr(sounds, name, None)
-        if sound_obj:
-            footsteps.sound_index = idx
-            footsteps.last_index = idx
-            sound_obj.play()
+
+class LandSoundSystem(System):
+    def update(self, dt: float):
+        entities = self.world.get_matching_entities({Player, Footsteps})
+        for entity in entities:
+            player = self.world.get_component(entity, Player)
+            footsteps = self.world.get_component(entity, Footsteps)
+            if not (player and footsteps):
+                continue
+
+            landed = player.landed
+            if landed:
+                play_footstep_sound(footsteps)
+                player.landed = False
 
 
 class RenderSystem(System):
@@ -520,13 +455,19 @@ class Game:
         self.world.add_system(GravitySystem(self.world))
         self.world.add_system(MovementSystem(self.world))
         self.world.add_system(CollisionSystem(self.world))
+        self.world.add_system(LandSoundSystem(self.world))
         self.world.add_system(WalkingAnimationSystem(self.world))
         self.world.add_system(FootstepSystem(self.world))
         self.world.add_system(RenderSystem(self.world))
+        self.world.add_system(CursorSystem(self.world))
 
         self._create_background()
         self._create_map()
         self._create_player()
+
+        # Cursor entity for in-game
+        cur = self.world.create_entity()
+        self.world.add_component(cur, Cursor("default"))
 
     def update(self, dt):
         self.world.update(dt)
@@ -669,8 +610,374 @@ class Game:
         )
 
 
+# region Menu
+
+MENU_STATE = "menu"  # "menu" or "game"
+
+pygame.mouse.set_visible(False)
+
+
+def play_click_sound():
+    if not SFX_ENABLED:
+        return
+
+    sounds.click5.play()
+
+
+def play_footstep_sound(footsteps):
+    names = footsteps.sound_names
+    if not names or not SFX_ENABLED:
+        return
+    count = len(names)
+    if count == 1:
+        idx = 0
+    else:
+        idx = footsteps.rng.randrange(count)
+        if idx == footsteps.last_index:
+            idx = (idx + 1) % count
+    name = names[idx]
+    sound_obj = getattr(sounds, name, None)
+    if sound_obj:
+        footsteps.sound_index = idx
+        footsteps.last_index = idx
+        sound_obj.play()
+
+
+class UIRect(Component):
+    def __init__(self, x: int, y: int, w: int, h: int):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+
+    def contains(self, pos: Tuple[int, int]) -> bool:
+        px, py = pos
+        return self.x <= px <= self.x + self.w and self.y <= py <= self.y + self.h
+
+
+class UIButton(Component):
+    def __init__(
+        self,
+        label: str,
+        action: str,
+        label_color: Tuple[int, int, int] = (0, 0, 0),
+        texture_normal: str = "button_rectangle",
+        texture_pressed: str = "button_rectangle_depth",
+    ):
+        self.label = label
+        self.label_color = label_color
+        self.action = action  # "start" | "toggle_music" | "toggle_sfx" | "exit"
+        self.texture_normal = texture_normal
+        self.texture_pressed = texture_pressed
+
+
+class Hoverable(Component):
+    def __init__(self):
+        pass
+
+
+class Pressable(Component):
+    def __init__(self):
+        self.is_pressed = False
+
+
+class UIButtonLabelSystem(System):
+    def update(self, dt: float):
+        # Keep labels for toggle buttons in sync
+        buttons = self.world.get_matching_entities({UIButton})
+        for e in buttons:
+            btn = self.world.get_component(e, UIButton)
+            if not btn:
+                continue
+            if btn.action == "toggle_music":
+                btn.label = f"Música {'ON' if MUSIC_ENABLED else 'OFF'}"
+            elif btn.action == "toggle_sfx":
+                btn.label = f"Sons: {'ON' if SFX_ENABLED else 'OFF'}"
+
+
+class UIButtonInputSystem(System):
+    def update(self, dt: float):
+        # Consume queued clicks
+        global MENU_STATE, MUSIC_ENABLED, SFX_ENABLED, _game
+        downs = list(_ui_mouse_downs)
+        ups = list(_ui_mouse_ups)
+        _ui_mouse_downs.clear()
+        _ui_mouse_ups.clear()
+
+        # Prepare button list
+        ents = self.world.get_matching_entities({UIRect, UIButton, Pressable})
+        items = []
+        for e in ents:
+            rect = self.world.get_component(e, UIRect)
+            btn = self.world.get_component(e, UIButton)
+            prs = self.world.get_component(e, Pressable)
+            if rect and btn and prs is not None:
+                items.append((e, rect, btn, prs))
+
+        # Mouse down: set pressed on the button under cursor
+        for pos in downs:
+            for _, rect, _, prs in items:
+                prs.is_pressed = False
+            for _, rect, _, prs in items:
+                if rect.contains(pos):
+                    prs.is_pressed = True
+                    play_click_sound()
+                    break
+
+        # Mouse up: if releasing on the same pressed button, trigger action
+        for pos in ups:
+            target = None
+            for e, rect, btn, prs in items:
+                if prs.is_pressed and rect.contains(pos):
+                    target = btn
+                prs.is_pressed = False
+            if target:
+                if target.action == "start":
+                    MENU_STATE = "game"
+                    if _game is None:
+                        _create_game()
+                    apply_music_state()
+                elif target.action == "toggle_music":
+                    MUSIC_ENABLED = not MUSIC_ENABLED
+                    apply_music_state()
+                elif target.action == "toggle_sfx":
+                    SFX_ENABLED = not SFX_ENABLED
+                elif target.action == "exit":
+                    quit()
+
+
+class UIDrawSystem(System):
+    def __init__(self, world):
+        super().__init__(world)
+        self.background_tiles = []
+        self._get_background_tiles()
+
+    def draw(self):
+        screen.clear()
+        BLACK = (120, 120, 120)
+        screen.fill(BLACK)
+
+        # Draw background tiles
+        for tile in self.background_tiles:
+            screen.blit(tile[2], (tile[0], tile[1]))
+
+        # Title
+        WHITE = (240, 240, 255)
+        screen.draw.text(
+            TITLE,
+            center=(WIDTH // 2, 140),
+            fontname="kenney_future",
+            fontsize=64,
+            color=WHITE,
+        )
+
+        # Buttons
+        ents = self.world.get_matching_entities({UIRect, UIButton})
+        for e in ents:
+            rect = self.world.get_component(e, UIRect)
+            button = self.world.get_component(e, UIButton)
+            pressable = self.world.get_component(e, Pressable)
+            if not (rect and button):
+                continue
+            r = Rect(rect.x, rect.y, rect.w, rect.h)
+
+            # Texture
+            texture_name = (
+                button.texture_pressed
+                if (pressable and pressable.is_pressed)
+                else button.texture_normal
+            )
+            texture = getattr(images, texture_name, None)
+
+            # Draw texture
+            try:
+                scaled = pygame.transform.smoothscale(texture, (r.w, r.h))
+            except Exception:
+                scaled = texture
+            screen.blit(scaled, (r.x, r.y))
+
+            # Label
+            screen.draw.text(
+                button.label,
+                center=r.center,
+                fontname="kenney_future",
+                fontsize=24,
+                color=button.label_color,
+            )
+
+    def _get_background_tiles(self):
+        if not self.background_tiles:
+            for x in range(0, WIDTH, TILE_SIZE):
+                for y in range(0, HEIGHT, TILE_SIZE):
+                    texture = self._get_random_dirt_texture()
+                    texture = getattr(images, texture, None)
+                    self.background_tiles.append((x, y, texture))
+
+    def _get_random_dirt_texture(self):
+        roll = random.random()
+        if roll < 0.09:
+            return "tile_green_08"
+        elif roll < 0.2:
+            return "tile_green_17"
+        return "tile_green_03"
+
+
+class UIHoverSystem(System):
+    def update(self, dt: float):
+        # Only if app window focused and cursor inside
+        if not pygame.mouse.get_focused():
+            return
+        mx, my = pygame.mouse.get_pos()
+        if not (0 <= mx < WIDTH and 0 <= my < HEIGHT):
+            return
+
+        # Default to normal cursor
+        cursor_entities = self.world.get_matching_entities({Cursor})
+        if not cursor_entities:
+            return
+        cursor = self.world.get_component(cursor_entities[0], Cursor)
+        if not cursor:
+            return
+        cursor.cursor_type = "default"
+
+        # Set pointer when hovering any Hoverable
+        ents = self.world.get_matching_entities({UIRect, Hoverable})
+        for e in ents:
+            rect = self.world.get_component(e, UIRect)
+            hov = self.world.get_component(e, Hoverable)
+            if rect and hov and rect.contains((mx, my)):
+                cursor.cursor_type = "pointer"
+                break
+
+
+class CursorSystem(System):
+    def __init__(self, world):
+        super().__init__(world)
+        self._hide_cursor()
+
+    def draw(self):
+        entities = self.world.get_matching_entities({Cursor})
+        if not entities:
+            return
+        entity = entities[0]
+        cursor = self.world.get_component(entity, Cursor)
+        if not cursor:
+            return
+
+        if not pygame.mouse.get_focused():
+            return
+
+        image_name = (
+            "cursor_pointer" if cursor.cursor_type == "pointer" else "cursor_default"
+        )
+        texture = getattr(images, image_name, None)
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        if texture:
+            screen.blit(
+                texture, (mouse_x - CURSOR_SIZE // 2, mouse_y - CURSOR_SIZE // 2)
+            )
+        else:
+            screen.draw.filled_circle(
+                (mouse_x - CURSOR_SIZE // 2, mouse_y - CURSOR_SIZE // 2),
+                CURSOR_SIZE,
+                (255, 255, 255),
+            )
+
+    def _hide_cursor(self):
+        try:
+            pygame.mouse.set_visible(False)
+        except Exception:
+            pass
+
+
+# UI world and click queue
+_ui_world: World | None = None
+_ui_mouse_downs: List[Tuple[int, int]] = []
+_ui_mouse_ups: List[Tuple[int, int]] = []
+
+
+def _ensure_ui_world():
+    global _ui_world
+
+    if _ui_world is not None:
+        return
+    _ui_world = World()
+    _ui_world.add_system(UIButtonLabelSystem(_ui_world))
+    _ui_world.add_system(UIButtonInputSystem(_ui_world))
+    _ui_world.add_system(UIDrawSystem(_ui_world))
+    _ui_world.add_system(UIHoverSystem(_ui_world))
+    _ui_world.add_system(CursorSystem(_ui_world))
+
+    create_layout()
+
+    # UI cursor entity (default type)
+    cur = _ui_world.create_entity()
+    _ui_world.add_component(cur, Cursor("default"))
+
+
+def create_layout():
+    global _ui_world
+    if _ui_world is None:
+        return
+    # If buttons already exist, don't recreate
+    if _ui_world.get_matching_entities({UIButton}):
+        return
+
+    BUTTONS_DIV_GAP = 8
+    TITLE_MB = 32
+
+    button_width = BUTTON_WIDTH * 1.5
+    button_height = BUTTON_HEIGHT
+
+    base_y = (HEIGHT - (button_height * 4 + BUTTONS_DIV_GAP * 3)) // 2 + TITLE_MB
+    x = (WIDTH - button_width) // 2
+
+    def add_button(y: int, label: str, action: str):
+        e = _ui_world.create_entity()
+        _ui_world.add_component(e, UIRect(x, y, button_width, button_height))
+        _ui_world.add_component(e, UIButton(label, action))
+        _ui_world.add_component(e, Hoverable())
+        _ui_world.add_component(e, Pressable())
+
+    add_button(base_y + 0 * (button_height + BUTTONS_DIV_GAP), "Start", "start")
+    add_button(base_y + 1 * (button_height + BUTTONS_DIV_GAP), "Music", "toggle_music")
+    add_button(base_y + 2 * (button_height + BUTTONS_DIV_GAP), "SFX", "toggle_sfx")
+    add_button(base_y + 3 * (button_height + BUTTONS_DIV_GAP), "Exit", "exit")
+
+
+def apply_music_state():
+    try:
+        # Stop both first to avoid overlap
+        sounds.music_space_cadet.stop()
+        sounds.music_sad_descent.stop()
+    except Exception:
+        pass
+
+    if not MUSIC_ENABLED:
+        return
+
+    try:
+        if MENU_STATE == "menu":
+            sounds.music_space_cadet.play(-1)
+        else:
+            sounds.music_sad_descent.play(-1)
+    except Exception:
+        pass
+
+
+# Apply initial music state
+apply_music_state()
+
+# endregion
+
 # Global game instance created on demand
 _game: Game | None = None
+
+
+def _create_game():
+    global _game
+    _game = Game()
 
 
 # Pygame Zero hooks
@@ -678,7 +985,8 @@ _game: Game | None = None
 
 def draw():
     if MENU_STATE == "menu":
-        draw_menu()
+        _ensure_ui_world()
+        _ui_world.draw()
     else:
         if _game:
             _game.draw()
@@ -686,40 +994,25 @@ def draw():
 
 def update(dt):
     if MENU_STATE == "menu":
+        _ensure_ui_world()
+        _ui_world.update(dt)
         return
     if _game:
         _game.update(dt)
-
-
-def on_key_down(key):
-    if key == keys.ESCAPE:
-        quit()
 
 
 def on_mouse_down(pos):
     global MENU_STATE, MUSIC_ENABLED, SFX_ENABLED, _game
     if MENU_STATE != "menu":
         return
+    _ui_mouse_downs.append(pos)
 
-    if btn_start.contains(pos):
-        MENU_STATE = "game"
-        if _game is None:
-            _game = Game()
+
+def on_mouse_up(pos):
+    global MENU_STATE
+    if MENU_STATE != "menu":
         return
-
-    if btn_music.contains(pos):
-        MUSIC_ENABLED = not MUSIC_ENABLED
-        _menu_labels_update()
-        apply_music_state()
-        return
-
-    if btn_sfx.contains(pos):
-        SFX_ENABLED = not SFX_ENABLED
-        _menu_labels_update()
-        return
-
-    if btn_exit.contains(pos):
-        quit()
+    _ui_mouse_ups.append(pos)
 
 
 pgzrun.go()

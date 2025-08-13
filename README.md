@@ -6,7 +6,7 @@ Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D feito em P
   <source src="docs/demo.mp4" type="video/mp4">
 </video>
 
-> Demonstração em vídeo do gameplay do Wibblo
+> Demonstração em vídeo do gameplay do Wibblo. Assista [aqui](docs/demo.mp4).
 
 ---
 

@@ -2,9 +2,7 @@
 
 Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D feito em Python.
 
-<video width="800" height="600" controls>
-  <source src="docs/demo.mp4" type="video/mp4">
-</video>
+![Demonstração do Wibblo](docs/demo.png)
 
 > Demonstração em vídeo do gameplay do Wibblo
 

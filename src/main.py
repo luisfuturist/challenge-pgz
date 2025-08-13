@@ -27,6 +27,15 @@ GRAVITY = 1200.0
 JUMP_FORCE = -500.0
 MOVE_SPEED = 300.0
 
+# Enemy constants
+ENEMY_WIDTH = 64
+ENEMY_HEIGHT = 64
+ENEMY_BASE_SPEED = 140.0
+ENEMY_SPAWN_INTERVAL = 3.0
+
+# Will be set in _create_map()
+GROUND_TOP_Y = 0
+
 # Audio toggles
 MUSIC_ENABLED = True
 SFX_ENABLED = True
@@ -104,14 +113,34 @@ class Player(Component):
         self.landed = False
 
 
+class Lives(Component):
+    def __init__(self, hearts: int = 5):
+        self.hearts = hearts
+        self.damage_timer = 0.0
+
+
+class Enemy(Component):
+    def __init__(self, speed: float = ENEMY_BASE_SPEED):
+        self.base_speed = speed
+
+
+class Blinky(Component):
+    pass
+
+
 class CollisionTarget(Component):
     def __init__(self, width: float, height: float):
         self.width = width
         self.height = height
+        self.colliding = False
 
 
 class Impactor(Component):
-    pass
+    def __init__(self):
+        self.colliding = False
+        self.colliding_with_enemy = False
+        self.colliding_with_enemy_side = False
+        self.colliding_with_enemy_top = False
 
 
 class Controls(Component):
@@ -140,6 +169,21 @@ class Footsteps(Component):
 class Cursor(Component):
     def __init__(self, cursor_type: Literal["default", "pointer"] = "default"):
         self.cursor_type = cursor_type
+
+
+class Difficulty(Component):
+    def __init__(self):
+        self.elapsed = 0.0
+        self.speed_multiplier = 1.0
+
+
+class DeathTimer(Component):
+    def __init__(self, time_remaining: float = 1.2):
+        self.time_remaining = time_remaining
+
+
+class Dead(Component):
+    pass
 
 
 # endregion
@@ -177,7 +221,7 @@ class MovementSystem(System):
             position.y += velocity.vy * dt
 
 
-class CollisionSystem(System):
+class CollisionResolutionSystem(System):
     def update(self, dt: float):
         # Entities that can move and collide
         impactors = self.world.get_matching_entities(
@@ -191,11 +235,15 @@ class CollisionSystem(System):
             col = self.world.get_component(entity, CollisionTarget)
             vel = self.world.get_component(entity, Velocity)
             player = self.world.get_component(entity, Player)
+            imp_comp = self.world.get_component(entity, Impactor)
+            enemy_self = self.world.get_component(entity, Enemy)
 
-            if not (pos and col and vel):
+            if not (pos and col and vel and imp_comp):
                 continue
 
             on_ground = False
+            # Capture vertical velocity before resolving collisions for stomp
+            vel_vy_before = vel.vy
 
             # World boundary collisions (left/right)
             if pos.x < 0:
@@ -214,6 +262,19 @@ class CollisionSystem(System):
                 vel.vy = 0
                 on_ground = True
 
+            # Only resolve against targets if flagged colliding
+            if not imp_comp.colliding:
+                if player is not None:
+                    try:
+                        if (not player.was_on_ground) and on_ground:
+                            player.landed = True
+                        player.was_on_ground = on_ground
+                    except AttributeError:
+                        player.was_on_ground = on_ground
+                        player.landed = False
+                    player.on_ground = on_ground
+                continue
+
             # Collide with other targets (tiles, etc.)
             for target in targets:
                 if target is entity:
@@ -222,6 +283,10 @@ class CollisionSystem(System):
                 tpos = self.world.get_component(target, Position)
                 tcol = self.world.get_component(target, CollisionTarget)
                 if not (tpos and tcol):
+                    continue
+
+                # Do not move enemies when colliding with the player
+                if enemy_self is not None and self.world.get_component(target, Player):
                     continue
 
                 # AABB overlap test using center/half-size method
@@ -259,6 +324,37 @@ class CollisionSystem(System):
                         pos.y -= py
                         vel.vy = 0
                         on_ground = True
+                        # If the impactor is the player and target is enemy,
+                        # treat as a stomp
+                        if player is not None:
+                            enemy = self.world.get_component(target, Enemy)
+                            if enemy is not None:
+                                # Stomp only if player was falling
+                                # before collision resolution
+                                if vel_vy_before > 0:
+                                    # Bounce the player and mark not on ground
+                                    vel.vy = JUMP_FORCE * 0.5
+                                    on_ground = False
+                                    # Kill enemy: show dead sprite and
+                                    # remove behavior/collision
+                                    tsprite = self.world.get_component(target, Sprite)
+                                    if tsprite:
+                                        tsprite.texture = "blinky_dead"
+                                    # Remove systems-affecting components
+                                    self.world.remove_component(target, Enemy)
+                                    self.world.remove_component(
+                                        target, WalkingAnimation
+                                    )
+                                    self.world.remove_component(target, Impactor)
+                                    self.world.remove_component(target, CollisionTarget)
+                                    # Ensure enemy will fall out of screen
+                                    tvel = self.world.get_component(target, Velocity)
+                                    if tvel:
+                                        tvel.vx = 0
+                                        # start falling from rest
+                                        tvel.vy = 0
+                                    # Keep gravity so it falls through
+                                    self.world.add_component(target, Dead())
 
             if player is not None:
                 # Detect landing (transition from air to ground)
@@ -384,6 +480,229 @@ class FootstepSystem(System):
                 footsteps.was_walking = False
 
 
+class DifficultySystem(System):
+    def update(self, dt: float):
+        entities = self.world.get_matching_entities({Difficulty})
+
+        if not entities:
+            return
+
+        difficulty = entities[0]
+        d = self.world.get_component(difficulty, Difficulty)
+        d.elapsed += dt
+        # Increase speed multiplier slowly over time
+        d.speed_multiplier = 1.0 + 0.02 * d.elapsed
+
+
+class EnemySpawnSystem(System):
+    def __init__(self, world):
+        super().__init__(world)
+        self.timer = 0.0
+
+    def update(self, dt: float):
+        self.timer += dt
+        if self.timer < ENEMY_SPAWN_INTERVAL:
+            return
+        self.timer = 0.0
+
+        self._spawn_blinky()
+
+    def _spawn_blinky(self):
+        # Spawn one Blinky from either left or right, just outside screen
+        side = -1 if random.random() < 0.5 else 1
+        if side < 0:
+            x = -TILE_SIZE
+        else:
+            x = WIDTH + TILE_SIZE
+        y = max(GROUND_TOP_Y - ENEMY_HEIGHT, 0)
+
+        e = self.world.create_entity()
+        self.world.add_component(e, Enemy(ENEMY_BASE_SPEED))
+        self.world.add_component(e, Blinky())
+        self.world.add_component(e, Position(x, y))
+        self.world.add_component(e, Velocity(0, 0))
+        self.world.add_component(e, Gravity(GRAVITY))
+        self.world.add_component(e, Impactor())
+        self.world.add_component(e, CollisionTarget(ENEMY_WIDTH, ENEMY_HEIGHT))
+        self.world.add_component(e, FlipX())
+        self.world.add_component(
+            e,
+            Sprite(
+                "blinky_walk01",
+                ENEMY_WIDTH,
+                ENEMY_HEIGHT,
+                anchor=("left", "top"),
+                offset=(0, 0),
+                layer=900,
+            ),
+        )
+        self.world.add_component(
+            e,
+            WalkingAnimation(
+                ["blinky_walk01", "blinky_walk02", "blinky_walk03"], fps=10
+            ),
+        )
+
+
+class EnemyAIChase(System):
+    def update(self, dt: float):
+        # Find player position
+        players = self.world.get_matching_entities({Player, Position})
+        if not players:
+            return
+        player_entity = players[0]
+        player_pos = self.world.get_component(player_entity, Position)
+        player_col = self.world.get_component(player_entity, CollisionTarget)
+
+        # Difficulty
+        mult = 1.0
+        diff_ents = self.world.get_matching_entities({Difficulty})
+        if diff_ents:
+            diff = self.world.get_component(diff_ents[0], Difficulty)
+            mult = diff.speed_multiplier
+
+        enemies = self.world.get_matching_entities({Enemy, Position, Velocity, FlipX})
+        for e in enemies:
+            pos = self.world.get_component(e, Position)
+            vel = self.world.get_component(e, Velocity)
+            enemy = self.world.get_component(e, Enemy)
+            flip = self.world.get_component(e, FlipX)
+            ecol = self.world.get_component(e, CollisionTarget)
+            if not (pos and vel and enemy):
+                continue
+            speed = enemy.base_speed * mult
+            if pos.x + ENEMY_WIDTH / 2 < player_pos.x:
+                vel.vx = speed
+                if flip:
+                    flip.flip = False
+            else:
+                vel.vx = -speed
+                if flip:
+                    flip.flip = True
+
+            # If overlapping the player, stand still (no pushing)
+            if ecol and player_col:
+                ax1, ay1 = pos.x, pos.y
+                ax2, ay2 = pos.x + ecol.width, pos.y + ecol.height
+                bx1, by1 = player_pos.x, player_pos.y
+                bx2, by2 = (
+                    player_pos.x + player_col.width,
+                    player_pos.y + player_col.height,
+                )
+                if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
+                    vel.vx = 0
+
+
+class CollisionDetectionSystem(System):
+    def update(self, dt: float):
+        # Reset flags
+        impactors = self.world.get_matching_entities(
+            {Impactor, Position, CollisionTarget}
+        )
+        targets = self.world.get_matching_entities({Position, CollisionTarget})
+        for e in impactors:
+            imp = self.world.get_component(e, Impactor)
+            if imp:
+                imp.colliding = False
+                imp.colliding_with_enemy = False
+                imp.colliding_with_enemy_side = False
+                imp.colliding_with_enemy_top = False
+        for t in targets:
+            tcol = self.world.get_component(t, CollisionTarget)
+            if tcol:
+                tcol.colliding = False
+
+        # Mark overlaps
+        for e in impactors:
+            pos_a = self.world.get_component(e, Position)
+            col_a = self.world.get_component(e, CollisionTarget)
+            if not (pos_a and col_a):
+                continue
+            enemy_a = self.world.get_component(e, Enemy)
+            imp_a = self.world.get_component(e, Impactor)
+            for t in targets:
+                if t is e:
+                    continue
+                pos_b = self.world.get_component(t, Position)
+                col_b = self.world.get_component(t, CollisionTarget)
+                if not (pos_b and col_b):
+                    continue
+                ax1, ay1 = pos_a.x, pos_a.y
+                ax2, ay2 = pos_a.x + col_a.width, pos_a.y + col_a.height
+                bx1, by1 = pos_b.x, pos_b.y
+                bx2, by2 = pos_b.x + col_b.width, pos_b.y + col_b.height
+                if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
+                    # Skip setting flags for enemy colliding with player
+                    # to avoid enemy pull and pushing
+                    if enemy_a is not None and self.world.get_component(t, Player):
+                        continue
+                    if imp_a:
+                        imp_a.colliding = True
+                        is_enemy_b = self.world.get_component(t, Enemy) is not None
+                        if is_enemy_b:
+                            imp_a.colliding_with_enemy = True
+                            # Determine side vs top overlap via axis test
+                            cx_a = pos_a.x + col_a.width / 2
+                            cy_a = pos_a.y + col_a.height / 2
+                            cx_b = pos_b.x + col_b.width / 2
+                            cy_b = pos_b.y + col_b.height / 2
+                            dx = cx_a - cx_b
+                            px = (col_a.width / 2 + col_b.width / 2) - abs(dx)
+                            dy = cy_a - cy_b
+                            py = (col_a.height / 2 + col_b.height / 2) - abs(dy)
+                            if py <= px and dy < 0:
+                                imp_a.colliding_with_enemy_top = True
+                            elif px < py:
+                                imp_a.colliding_with_enemy_side = True
+                    col_b.colliding = True
+
+
+class EnemySpriteSystem(System):
+    def update(self, dt: float):
+        ents = self.world.get_matching_entities({WalkingAnimation, Sprite, Enemy})
+        for e in ents:
+            anim = self.world.get_component(e, WalkingAnimation)
+            sprite = self.world.get_component(e, Sprite)
+            if anim and sprite and anim.frames:
+                idx = max(min(anim.frame_index, len(anim.frames) - 1), 0)
+                sprite.texture = anim.frames[idx]
+
+
+class ContactDamageSystem(System):
+    def update(self, dt: float):
+        # Player damage based on flags with cooldown
+        players = self.world.get_matching_entities({Player, Lives, Impactor})
+        if not players:
+            return
+        p = players[0]
+        lives = self.world.get_component(p, Lives)
+        imp = self.world.get_component(p, Impactor)
+        if not (lives and imp):
+            return
+        # cooldown countdown
+        if lives.damage_timer > 0:
+            lives.damage_timer = max(0.0, lives.damage_timer - dt)
+        # apply damage only for side collisions with enemies
+        if (
+            imp.colliding_with_enemy
+            and imp.colliding_with_enemy_side
+            and not imp.colliding_with_enemy_top
+            and lives.damage_timer <= 0.0
+            and lives.hearts > 0
+        ):
+            lives.hearts -= 1
+            lives.damage_timer = 1.0
+
+        # Transition to game over when lives reach zero
+        if lives.hearts <= 0:
+            global MENU_STATE
+            if MENU_STATE != "game_over":
+                MENU_STATE = "game_over"
+                _ensure_ui_world()
+                reset_ui_for_state()
+                apply_music_state()
+
+
 class LandSoundSystem(System):
     def update(self, dt: float):
         entities = self.world.get_matching_entities({Player, Footsteps})
@@ -438,6 +757,66 @@ class RenderSystem(System):
             screen.blit(texture, (pos.x + offset_x, pos.y + offset_y))
 
 
+class HUDSystem(System):
+    def __init__(self, world):
+        super().__init__(world)
+
+    def draw(self):
+        players = self.world.get_matching_entities({Player, Lives})
+        if not players:
+            return
+        lives = self.world.get_component(players[0], Lives)
+        if not lives:
+            return
+
+        pad = 8
+        gap = 6
+        x = pad
+        y = pad
+
+        badge = getattr(images, "badge_p2", None)
+        if badge:
+            try:
+                w = badge.get_width()
+            except Exception:
+                w = 24
+            count = max(lives.hearts, 0)
+            for i in range(count):
+                screen.blit(badge, (x + i * (w + gap), y))
+        else:
+            # Fallback: draw simple rectangles if badge missing
+            w = 18
+            h = 18
+            count = max(lives.hearts, 0)
+            for i in range(count):
+                screen.draw.filled_rect(
+                    Rect(x + i * (w + gap), y, w, h),
+                    (220, 60, 60),
+                )
+
+
+class DeathCleanupSystem(System):
+    def update(self, dt: float):
+        # Timer-based cleanup (backward compatible)
+        ents_timer = self.world.get_matching_entities({DeathTimer})
+        for e in ents_timer:
+            timer = self.world.get_component(e, DeathTimer)
+            if not timer:
+                continue
+            timer.time_remaining -= dt
+            if timer.time_remaining <= 0:
+                self.world.destroy_entity(e)
+
+        # Off-screen cleanup for dead falling enemies
+        ents_dead = self.world.get_matching_entities({Dead, Position})
+        for e in ents_dead:
+            pos = self.world.get_component(e, Position)
+            if not pos:
+                continue
+            if pos.y > HEIGHT + ENEMY_HEIGHT:
+                self.world.destroy_entity(e)
+
+
 # endregion
 
 
@@ -450,21 +829,32 @@ class Game:
         self.player = None
         self.input = Controls()
 
+        # Add global difficulty entity
+        difficulty = self.world.create_entity()
+        self.world.add_component(difficulty, Difficulty())
+
         # Add systems
         self.world.add_system(ControlsSystem(self.world))
         self.world.add_system(GravitySystem(self.world))
         self.world.add_system(MovementSystem(self.world))
-        self.world.add_system(CollisionSystem(self.world))
+        self.world.add_system(CollisionDetectionSystem(self.world))
+        self.world.add_system(CollisionResolutionSystem(self.world))
         self.world.add_system(LandSoundSystem(self.world))
+        self.world.add_system(DifficultySystem(self.world))
+        self.world.add_system(EnemySpawnSystem(self.world))
+        self.world.add_system(EnemyAIChase(self.world))
         self.world.add_system(WalkingAnimationSystem(self.world))
+        self.world.add_system(EnemySpriteSystem(self.world))
+        self.world.add_system(ContactDamageSystem(self.world))
         self.world.add_system(FootstepSystem(self.world))
+        self.world.add_system(DeathCleanupSystem(self.world))
         self.world.add_system(RenderSystem(self.world))
         self.world.add_system(CursorSystem(self.world))
+        self.world.add_system(HUDSystem(self.world))
 
         self._create_background()
         self._create_map()
         self._create_player()
-
         # Cursor entity for in-game
         cur = self.world.create_entity()
         self.world.add_component(cur, Cursor("default"))
@@ -525,6 +915,8 @@ class Game:
 
         cols = WIDTH // TILE_SIZE + 1
         grass_row = (HEIGHT // TILE_SIZE) - 3  # 3 rows above the bottom
+        global GROUND_TOP_Y
+        GROUND_TOP_Y = grass_row * TILE_SIZE
 
         # Create the grass row
         for c in range(cols):
@@ -574,6 +966,7 @@ class Game:
             ),
         )
         self.world.add_component(self.player, Player())
+        self.world.add_component(self.player, Lives(5))
         self.world.add_component(self.player, self.input)
         self.world.add_component(self.player, FlipX())
         self.world.add_component(
@@ -612,7 +1005,7 @@ class Game:
 
 # region Menu
 
-MENU_STATE = "menu"  # "menu" or "game"
+MENU_STATE = "menu"  # "menu" | "game" | "game_over"
 
 pygame.mouse.set_visible(False)
 
@@ -661,8 +1054,8 @@ class UIButton(Component):
         label: str,
         action: str,
         label_color: Tuple[int, int, int] = (0, 0, 0),
-        texture_normal: str = "button_rectangle",
-        texture_pressed: str = "button_rectangle_depth",
+        texture_normal: str = "button_rectangle_normal",
+        texture_pressed: str = "button_rectangle_pressed",
     ):
         self.label = label
         self.label_color = label_color
@@ -744,32 +1137,59 @@ class UIButtonInputSystem(System):
                     SFX_ENABLED = not SFX_ENABLED
                 elif target.action == "exit":
                     quit()
+                elif target.action == "restart":
+                    MENU_STATE = "game"
+                    _game = None
+                    _create_game()
+                    apply_music_state()
+                elif target.action == "menu":
+                    MENU_STATE = "menu"
+                    _game = None
+                    _ensure_ui_world()
+                    reset_ui_for_state()
+                    apply_music_state()
 
 
 class UIDrawSystem(System):
     def __init__(self, world):
         super().__init__(world)
-        self.background_tiles = []
-        self._get_background_tiles()
+        self.background_tiles_normal = []
+        self.background_tiles_game_over = []
+        self.generate_background_tiles_normal()
+        self.generate_background_tiles_game_over()
 
     def draw(self):
         screen.clear()
-        BLACK = (120, 120, 120)
-        screen.fill(BLACK)
+        GRAY = (120, 120, 120)
+        screen.fill(GRAY)
 
         # Draw background tiles
-        for tile in self.background_tiles:
-            screen.blit(tile[2], (tile[0], tile[1]))
+        if MENU_STATE == "game_over":
+            for tile in self.background_tiles_game_over:
+                screen.blit(tile[2], (tile[0], tile[1]))
+        else:
+            for tile in self.background_tiles_normal:
+                screen.blit(tile[2], (tile[0], tile[1]))
 
         # Title
-        WHITE = (240, 240, 255)
-        screen.draw.text(
-            TITLE,
-            center=(WIDTH // 2, 140),
-            fontname="kenney_future",
-            fontsize=64,
-            color=WHITE,
-        )
+        if MENU_STATE == "game_over":
+            RED = (220, 60, 60)
+            screen.draw.text(
+                "Game Over",
+                center=(WIDTH // 2, 140),
+                fontname="kenney_future",
+                fontsize=64,
+                color=RED,
+            )
+        else:
+            BLACK = (0, 0, 0)
+            screen.draw.text(
+                TITLE,
+                center=(WIDTH // 2, 140),
+                fontname="kenney_future",
+                fontsize=64,
+                color=BLACK,
+            )
 
         # Buttons
         ents = self.world.get_matching_entities({UIRect, UIButton})
@@ -805,13 +1225,21 @@ class UIDrawSystem(System):
                 color=button.label_color,
             )
 
-    def _get_background_tiles(self):
-        if not self.background_tiles:
+    def generate_background_tiles_normal(self):
+        if not self.background_tiles_normal:
             for x in range(0, WIDTH, TILE_SIZE):
                 for y in range(0, HEIGHT, TILE_SIZE):
                     texture = self._get_random_dirt_texture()
                     texture = getattr(images, texture, None)
-                    self.background_tiles.append((x, y, texture))
+                    self.background_tiles_normal.append((x, y, texture))
+
+    def generate_background_tiles_game_over(self):
+        if not self.background_tiles_game_over:
+            for x in range(0, WIDTH, TILE_SIZE):
+                for y in range(0, HEIGHT, TILE_SIZE):
+                    texture = self._get_random_game_over_texture()
+                    texture = getattr(images, texture, None)
+                    self.background_tiles_game_over.append((x, y, texture))
 
     def _get_random_dirt_texture(self):
         roll = random.random()
@@ -820,6 +1248,14 @@ class UIDrawSystem(System):
         elif roll < 0.2:
             return "tile_green_17"
         return "tile_green_03"
+
+    def _get_random_game_over_texture(self):
+        roll = random.random()
+        if roll < 0.09:
+            return "tile_brown_09"
+        elif roll < 0.2:
+            return "tile_brown_18"
+        return "tile_brown_27"
 
 
 class UIHoverSystem(System):
@@ -930,20 +1366,55 @@ def create_layout():
     button_width = BUTTON_WIDTH * 1.5
     button_height = BUTTON_HEIGHT
 
-    base_y = (HEIGHT - (button_height * 4 + BUTTONS_DIV_GAP * 3)) // 2 + TITLE_MB
+    # Configure buttons for current UI state
+    if MENU_STATE == "game_over":
+        buttons_spec = [
+            ("Reiniciar", "restart"),
+            ("Menu", "menu"),
+        ]
+    else:
+        buttons_spec = [
+            ("Começar", "start"),
+            ("Música", "toggle_music"),
+            ("Sons", "toggle_sfx"),
+            ("Sair", "exit"),
+        ]
+
+    num_buttons = len(buttons_spec)
+    base_y = (
+        HEIGHT - (button_height * num_buttons + BUTTONS_DIV_GAP * (num_buttons - 1))
+    ) // 2 + TITLE_MB
     x = (WIDTH - button_width) // 2
 
     def add_button(y: int, label: str, action: str):
         e = _ui_world.create_entity()
         _ui_world.add_component(e, UIRect(x, y, button_width, button_height))
-        _ui_world.add_component(e, UIButton(label, action))
+        _ui_world.add_component(
+            e,
+            UIButton(
+                label,
+                action,
+                texture_normal="button_rectangle_depth",
+                texture_pressed="button_rectangle_depth",
+            ),
+        )
         _ui_world.add_component(e, Hoverable())
         _ui_world.add_component(e, Pressable())
 
-    add_button(base_y + 0 * (button_height + BUTTONS_DIV_GAP), "Start", "start")
-    add_button(base_y + 1 * (button_height + BUTTONS_DIV_GAP), "Music", "toggle_music")
-    add_button(base_y + 2 * (button_height + BUTTONS_DIV_GAP), "SFX", "toggle_sfx")
-    add_button(base_y + 3 * (button_height + BUTTONS_DIV_GAP), "Exit", "exit")
+    for i, (label, action) in enumerate(buttons_spec):
+        add_button(base_y + i * (button_height + BUTTONS_DIV_GAP), label, action)
+
+
+def reset_ui_for_state():
+    global _ui_world
+    if _ui_world is None:
+        return
+    # Remove existing UI button entities
+    ents = _ui_world.get_matching_entities({UIButton})
+    for e in ents:
+        _ui_world.destroy_entity(e)
+    # Recreate the layout for the current state
+    create_layout()
 
 
 def apply_music_state():
@@ -951,6 +1422,7 @@ def apply_music_state():
         # Stop both first to avoid overlap
         sounds.music_space_cadet.stop()
         sounds.music_sad_descent.stop()
+        sounds.music_game_over.stop()
     except Exception:
         pass
 
@@ -960,6 +1432,8 @@ def apply_music_state():
     try:
         if MENU_STATE == "menu":
             sounds.music_space_cadet.play(-1)
+        elif MENU_STATE == "game_over":
+            sounds.music_game_over.play(-1)
         else:
             sounds.music_sad_descent.play(-1)
     except Exception:
@@ -984,7 +1458,7 @@ def _create_game():
 
 
 def draw():
-    if MENU_STATE == "menu":
+    if MENU_STATE in ("menu", "game_over"):
         _ensure_ui_world()
         _ui_world.draw()
     else:
@@ -993,7 +1467,7 @@ def draw():
 
 
 def update(dt):
-    if MENU_STATE == "menu":
+    if MENU_STATE in ("menu", "game_over"):
         _ensure_ui_world()
         _ui_world.update(dt)
         return
@@ -1003,14 +1477,14 @@ def update(dt):
 
 def on_mouse_down(pos):
     global MENU_STATE, MUSIC_ENABLED, SFX_ENABLED, _game
-    if MENU_STATE != "menu":
+    if MENU_STATE not in ("menu", "game_over"):
         return
     _ui_mouse_downs.append(pos)
 
 
 def on_mouse_up(pos):
     global MENU_STATE
-    if MENU_STATE != "menu":
+    if MENU_STATE not in ("menu", "game_over"):
         return
     _ui_mouse_ups.append(pos)
 

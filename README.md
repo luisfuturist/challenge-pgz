@@ -13,7 +13,6 @@ Wibblo é um protótipo de um jogo de sobrevivência de plataforma 2D acelerado,
 - Sistema de movimento e animações implementado com classes
 - Herói e inimigos animados por sprites (ex: andando)
 - Código compatível com PEP8 utilizando [black](https://github.com/psf/black) e [flake8](https://github.com/PyCQA/flake8)
-- Sem bugs (nenhum bug encontrado)
 
 ## Instalação
 

@@ -97,4 +97,10 @@ description: A prioritized list of tasks, features, and ideas for future develop
 
 ### Project Management
 
+### High priority
+
+### Medium priority
+
 - Add roadmap
+
+### Low priority

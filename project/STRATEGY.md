@@ -4,7 +4,7 @@ description: The key strategies for developing, releasing, and growing the game.
 
 # Strategy
 
-## Operatioanl
+## Operational
 
 ### Releasing
 
